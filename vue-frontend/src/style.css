@@ -103,6 +103,12 @@ button.secondary,
   box-shadow: none;
 }
 
+button.secondary.active {
+  background: rgba(36, 87, 67, 0.12);
+  color: var(--green-dark);
+  border-color: rgba(36, 87, 67, 0.42);
+}
+
 button.danger { background: linear-gradient(135deg, #b94d3e, var(--red)); }
 button:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
 
@@ -360,6 +366,52 @@ p { line-height: 1.68; }
 
 .muted { color: var(--muted); }
 .score { font-weight: 900; color: var(--orange); }
+
+.review-card--reported {
+  background: rgba(255, 252, 244, 0.58);
+  border-style: dashed;
+}
+
+.review-folded {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.review-folded > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.report-box {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid rgba(169, 68, 56, 0.18);
+  border-radius: 16px;
+  background: rgba(169, 68, 56, 0.06);
+}
+
+.report-box input { width: min(100%, 520px); }
+
+.report-meta {
+  display: block;
+  max-width: 240px;
+  margin-top: 4px;
+  line-height: 1.45;
+}
+
+.action-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
 
 .empty {
   padding: 30px;

@@ -75,4 +75,5 @@ export const api = {
   adminUpdateStall: (id, body) => client.put(`/admin/stalls/${id}`, body),
   adminDeleteStall: (id) => client.delete(`/admin/stalls/${id}`),
   adminDeleteReview: (id) => client.delete(`/admin/reviews/${id}`),
+  adminResolveReviewReports: (id) => client.put(`/admin/reviews/${id}/reports`, {}),
 }

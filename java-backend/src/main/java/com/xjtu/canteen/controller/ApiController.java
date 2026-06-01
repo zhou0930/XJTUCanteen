@@ -122,12 +122,13 @@ public class ApiController {
 
     @GetMapping("/stalls/{id}/reviews")
     public ResponseEntity<ApiResponse> stallReviews(
+        HttpServletRequest request,
         @PathVariable Long id,
         @RequestParam(defaultValue = "1") int page,
         @RequestParam(name = "page_size", defaultValue = "10") int pageSize,
         @RequestParam(name = "sort_by", defaultValue = "latest") String sortBy
     ) {
-        return ResponseEntity.ok(ApiResponse.success(coreService.getStallReviews(id, page, pageSize, sortBy)));
+        return ResponseEntity.ok(ApiResponse.success(coreService.getStallReviews(id, page, pageSize, sortBy, authUserId(request))));
     }
 
     @PostMapping("/reviews")
@@ -358,6 +359,15 @@ public class ApiController {
         ResponseEntity<ApiResponse> guard = requireAdmin(request);
         if (guard != null) return guard;
         Map<String, Object> item = coreService.softDeleteReview(id);
+        if (item == null) return notFound();
+        return ResponseEntity.ok(ApiResponse.success(item));
+    }
+
+    @PutMapping("/admin/reviews/{id}/reports")
+    public ResponseEntity<ApiResponse> adminResolveReviewReports(HttpServletRequest request, @PathVariable Long id) {
+        ResponseEntity<ApiResponse> guard = requireAdmin(request);
+        if (guard != null) return guard;
+        Map<String, Object> item = coreService.resolveReviewReports(id);
         if (item == null) return notFound();
         return ResponseEntity.ok(ApiResponse.success(item));
     }

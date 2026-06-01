@@ -12,7 +12,8 @@ const toast = useToast()
 const detail = ref(null)
 const reviews = ref([])
 const form = reactive({ rating: 5, content: '' })
-const reportReason = ref('')
+const reportForms = reactive({})
+const reportingReviewId = ref(null)
 
 const load = async () => {
   const id = route.params.id
@@ -54,19 +55,31 @@ const addBlack = async () => {
   else toast.error(r.message || '操作失败')
 }
 
-const likeReview = async (id) => {
+const likeReview = async (review) => {
   if (!requireLogin()) return
-  const r = await api.likeReview(id)
+  if (review.reported_by_me) {
+    toast.error('已举报的评论不能标记有用')
+    return
+  }
+  const r = await api.likeReview(review.id)
   if (r.code !== 0) return toast.error(r.message || '点赞失败')
-  toast.success('已点赞')
+  toast.success(r.data?.liked ? '已标记为有用' : '已取消有用')
   await load()
 }
 
-const reportReview = async (id) => {
+const openReportForm = (review) => {
   if (!requireLogin()) return
-  const r = await api.reportReview(id, { reason: reportReason.value || '内容不合适' })
+  if (review.reported_by_me) return
+  reportingReviewId.value = reportingReviewId.value === review.id ? null : review.id
+}
+
+const submitReport = async (review) => {
+  if (!requireLogin()) return
+  const reason = (reportForms[review.id] || '').trim()
+  const r = await api.reportReview(review.id, { reason })
   if (r.code !== 0) return toast.error(r.message || '举报失败')
-  reportReason.value = ''
+  reportForms[review.id] = ''
+  reportingReviewId.value = null
   toast.success('已提交举报')
   await load()
 }
@@ -102,21 +115,35 @@ onMounted(load)
   </form>
 
   <h3>评价列表</h3>
-  <div v-if="reviews.length" class="panel row" style="margin-bottom:12px;">
-    <input v-model="reportReason" style="flex:1 1 260px;" placeholder="举报原因，可选" />
-    <span class="muted">点击某条评价的举报按钮会提交给管理员处理</span>
-  </div>
-  <article v-for="r in reviews" :key="r.id" class="card">
-    <div class="row" style="justify-content:space-between;">
-      <strong>{{ r.username || '匿名用户' }}</strong>
-      <span class="score">{{ r.rating }} 分</span>
+  <article v-for="r in reviews" :key="r.id" class="card" :class="{ 'review-card--reported': r.reported_by_me }">
+    <div v-if="r.reported_by_me" class="review-folded">
+      <div>
+        <strong>{{ r.username || '匿名用户' }}</strong>
+        <span class="muted">已举报，评论已折叠。</span>
+      </div>
+      <small class="muted">{{ r.updated_at || r.created_at }}</small>
     </div>
-    <p>{{ r.content || '这位同学没有留下文字评价。' }}</p>
-    <div class="row">
-      <button class="secondary" type="button" @click="likeReview(r.id)">有用 {{ r.like_count || 0 }}</button>
-      <button class="secondary" type="button" @click="reportReview(r.id)">举报 {{ r.report_count || 0 }}</button>
-    </div>
-    <small class="muted">{{ r.updated_at || r.created_at }}</small>
+    <template v-else>
+      <div class="row" style="justify-content:space-between;">
+        <strong>{{ r.username || '匿名用户' }}</strong>
+        <span class="score">{{ r.rating }} 分</span>
+      </div>
+      <p>{{ r.content || '这位同学没有留下文字评价。' }}</p>
+      <div class="row">
+        <button class="secondary" :class="{ active: r.liked_by_me }" type="button" @click="likeReview(r)">
+          {{ r.liked_by_me ? '取消有用' : '有用' }} {{ r.like_count || 0 }}
+        </button>
+        <button class="secondary" type="button" @click="openReportForm(r)">举报 {{ r.report_count || 0 }}</button>
+      </div>
+      <form v-if="reportingReviewId === r.id" class="report-box" @submit.prevent="submitReport(r)">
+        <input v-model="reportForms[r.id]" placeholder="举报原因，可选" />
+        <div class="row">
+          <button class="danger" type="submit">提交举报</button>
+          <button class="secondary" type="button" @click="reportingReviewId = null">取消</button>
+        </div>
+      </form>
+      <small class="muted">{{ r.updated_at || r.created_at }}</small>
+    </template>
   </article>
   <div v-if="!reviews.length" class="empty panel">暂无评价。</div>
 </template>

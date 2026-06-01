@@ -153,6 +153,12 @@ class CoreServiceIntegrationTest extends CanteenTestBase {
         Map<String, Object> review = coreService.createOrUpdateReview(author, sid, 4, "味道不错");
         Long reviewId = ((Number) review.get("id")).longValue();
 
+        Map<String, Object> like = coreService.likeReview(reader, reviewId);
+        assertThat(like.get("liked")).isEqualTo(true);
+        assertThat(like.get("like_count")).isEqualTo(1);
+        like = coreService.likeReview(reader, reviewId);
+        assertThat(like.get("liked")).isEqualTo(false);
+        assertThat(like.get("like_count")).isEqualTo(0);
         assertThat(coreService.likeReview(reader, reviewId).get("like_count")).isEqualTo(1);
         assertThat(coreService.reportReview(reader, reviewId, "疑似广告").get("report_count")).isEqualTo(1);
         assertThat(coreService.reportReview(reader, reviewId, "重复点击").get("report_count")).isEqualTo(1);
@@ -166,6 +172,11 @@ class CoreServiceIntegrationTest extends CanteenTestBase {
         Map<String, Object> dashboard = coreService.adminDashboard();
         assertThat(dashboard.get("pending_report_count")).isEqualTo(2);
         assertThat((List<?>) dashboard.get("top_stalls")).isNotEmpty();
+
+        Map<String, Object> resolved = coreService.resolveReviewReports(reviewId);
+        assertThat(resolved.get("updated_count")).isEqualTo(2);
+        dashboard = coreService.adminDashboard();
+        assertThat(dashboard.get("pending_report_count")).isEqualTo(0);
 
         coreService.softDeleteReview(reviewId);
         dashboard = coreService.adminDashboard();

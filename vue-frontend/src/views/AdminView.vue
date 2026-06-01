@@ -123,6 +123,17 @@ const deleteReviewById = async (id) => {
   await deleteReview()
 }
 
+const resolveReviewReports = async (id) => {
+  const r = await api.adminResolveReviewReports(id)
+  if (r.code !== 0) return toast.error(r.message || '处理失败')
+  toast.success(r.data?.updated_count ? '举报已标记为已处理' : '没有待处理举报')
+  const [, dashboardData] = await Promise.all([
+    loadAdminReviews(),
+    api.adminDashboard(),
+  ])
+  dashboard.value = dashboardData.data || null
+}
+
 const setRole = async (item, role) => {
   const r = await api.adminUpdateUserRole(item.id, { role })
   if (r.code !== 0) return toast.error(r.message || '更新失败')
@@ -242,7 +253,8 @@ onMounted(load)
         <option v-for="s in stalls" :key="s.id" :value="s.id">{{ s.name }}</option>
       </select>
       <select v-model="reviewFilters.status">
-        <option value="">正常评论</option>
+        <option value="">未删除评论</option>
+        <option value="reported">待处理举报</option>
         <option value="deleted">已删除</option>
       </select>
       <button type="submit">筛选</button>
@@ -259,8 +271,17 @@ onMounted(load)
             <td>{{ r.rating }}</td>
             <td>{{ r.content || '-' }}</td>
             <td>{{ r.like_count || 0 }}</td>
-            <td>{{ r.report_count || 0 }}</td>
-            <td><button v-if="!r.is_deleted" class="danger" type="button" @click="deleteReviewById(r.id)">删除</button></td>
+            <td>
+              <strong :class="{ score: Number(r.report_count || 0) > 0 }">{{ r.report_count || 0 }}</strong>
+              <small v-if="Number(r.report_count || 0) > 0" class="report-meta muted">
+                {{ r.latest_report_user || '匿名用户' }}：{{ r.latest_report_reason || '未填写原因' }}
+              </small>
+            </td>
+            <td class="action-cell">
+              <button v-if="Number(r.report_count || 0) > 0 && !r.is_deleted" class="secondary" type="button" @click="resolveReviewReports(r.id)">标记已处理</button>
+              <button v-if="!r.is_deleted" class="danger" type="button" @click="deleteReviewById(r.id)">删除</button>
+              <span v-if="r.is_deleted" class="muted">已删除</span>
+            </td>
           </tr>
         </tbody>
       </table>

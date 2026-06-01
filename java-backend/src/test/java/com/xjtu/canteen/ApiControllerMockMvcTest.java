@@ -130,6 +130,34 @@ class ApiControllerMockMvcTest extends CanteenTestBase {
             .andExpect(jsonPath("$.code").value(0));
         Long reviewId = jdbc.queryForObject("SELECT id FROM review WHERE user_id <> ?", Long.class, uid);
 
+        mvc.perform(post("/api/reviews/{id}/likes", reviewId).header("Authorization", "Bearer " + userToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.liked").value(true))
+            .andExpect(jsonPath("$.data.like_count").value(1));
+
+        mvc.perform(post("/api/reviews/{id}/likes", reviewId).header("Authorization", "Bearer " + userToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.liked").value(false))
+            .andExpect(jsonPath("$.data.like_count").value(0));
+
+        mvc.perform(post("/api/reviews/{id}/reports", reviewId).header("Authorization", "Bearer " + userToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json(Map.of("reason", "不合适"))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.report_count").value(1));
+
+        mvc.perform(get("/api/admin/reviews").header("Authorization", "Bearer " + adminToken)
+                .param("status", "reported"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(1))
+            .andExpect(jsonPath("$.data.list[0].report_count").value(1))
+            .andExpect(jsonPath("$.data.list[0].latest_report_reason").value("不合适"));
+
+        mvc.perform(put("/api/admin/reviews/{id}/reports", reviewId).header("Authorization", "Bearer " + adminToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.updated_count").value(1))
+            .andExpect(jsonPath("$.data.report_count").value(0));
+
         mvc.perform(delete("/api/admin/reviews/{id}", reviewId).header("Authorization", "Bearer " + adminToken))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0));

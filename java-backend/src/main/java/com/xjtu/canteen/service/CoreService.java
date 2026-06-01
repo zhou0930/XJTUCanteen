@@ -233,24 +233,38 @@ public class CoreService {
     }
 
     public Map<String, Object> getStallReviews(Long stallId, int page, int pageSize, String sortBy) {
+        return getStallReviews(stallId, page, pageSize, sortBy, null);
+    }
+
+    public Map<String, Object> getStallReviews(Long stallId, int page, int pageSize, String sortBy, Long viewerId) {
         String order = " ORDER BY r.created_at DESC, r.id DESC ";
         if ("score_desc".equals(sortBy)) order = " ORDER BY r.rating DESC, r.created_at DESC, r.id DESC ";
         int total = jdbc.queryForObject("SELECT COUNT(*) FROM review WHERE stall_id = ? AND is_deleted = 0", Integer.class, stallId);
         List<Map<String, Object>> list = jdbc.queryForList(
             "SELECT r.id, r.user_id, u.username, r.rating, r.content, r.created_at, r.updated_at, " +
                 "(SELECT COUNT(*) FROM review_like rl WHERE rl.review_id = r.id) AS like_count, " +
-                "(SELECT COUNT(DISTINCT rr.user_id) FROM review_report rr WHERE rr.review_id = r.id AND rr.status = 0) AS report_count " +
+                "(SELECT COUNT(DISTINCT rr.user_id) FROM review_report rr WHERE rr.review_id = r.id AND rr.status = 0) AS report_count, " +
+                "EXISTS(SELECT 1 FROM review_like my_rl WHERE my_rl.review_id = r.id AND my_rl.user_id = ?) AS liked_by_me, " +
+                "EXISTS(SELECT 1 FROM review_report my_rr WHERE my_rr.review_id = r.id AND my_rr.user_id = ? AND my_rr.status = 0) AS reported_by_me " +
                 "FROM review r JOIN user u ON u.id = r.user_id WHERE r.stall_id = ? AND r.is_deleted = 0 " + order + " LIMIT ? OFFSET ?",
-            stallId, pageSize, (page - 1) * pageSize
+            viewerId, viewerId, stallId, pageSize, (page - 1) * pageSize
         );
         return pagePayload(list, total, page, pageSize);
     }
 
     public Map<String, Object> likeReview(Long userId, Long reviewId) {
         if (one("SELECT id FROM review WHERE id = ? AND is_deleted = 0", reviewId) == null) return null;
-        jdbc.update("INSERT IGNORE INTO review_like (user_id, review_id) VALUES (?, ?)", userId, reviewId);
+        Map<String, Object> existing = one("SELECT id FROM review_like WHERE user_id = ? AND review_id = ?", userId, reviewId);
+        boolean liked;
+        if (existing == null) {
+            jdbc.update("INSERT INTO review_like (user_id, review_id) VALUES (?, ?)", userId, reviewId);
+            liked = true;
+        } else {
+            jdbc.update("DELETE FROM review_like WHERE user_id = ? AND review_id = ?", userId, reviewId);
+            liked = false;
+        }
         Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM review_like WHERE review_id = ?", Integer.class, reviewId);
-        return Map.of("result", "success", "like_count", count);
+        return Map.of("result", "success", "liked", liked, "like_count", count);
     }
 
     public Map<String, Object> reportReview(Long userId, Long reviewId, String reason) {
@@ -260,6 +274,10 @@ public class CoreService {
             Long id = insertAndReturnId("INSERT INTO review_report (user_id, review_id, reason) VALUES (?, ?, ?)",
                 userId, reviewId, nullableValue(reason));
             report = one("SELECT id, user_id, review_id, reason, status, created_at FROM review_report WHERE id = ?", id);
+        } else {
+            jdbc.update("UPDATE review_report SET reason = ?, status = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                nullableValue(reason), report.get("id"));
+            report = one("SELECT id, user_id, review_id, reason, status, created_at FROM review_report WHERE id = ?", report.get("id"));
         }
         Integer count = jdbc.queryForObject("SELECT COUNT(DISTINCT user_id) FROM review_report WHERE review_id = ? AND status = 0", Integer.class, reviewId);
         if (report != null)
@@ -291,6 +309,7 @@ public class CoreService {
         Map<String, Object> row = one("SELECT * FROM review WHERE id = ?", reviewId);
         if (row == null) return null;
         jdbc.update("UPDATE review SET is_deleted = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?", reviewId);
+        jdbc.update("UPDATE review_report SET status = 1, updated_at = CURRENT_TIMESTAMP WHERE review_id = ? AND status = 0", reviewId);
         recalculateStallStats(((Number) row.get("stallId")).longValue());
         return Map.of("result", "success");
     }
@@ -430,8 +449,14 @@ public class CoreService {
             " FROM review r JOIN user u ON u.id = r.user_id JOIN stall s ON s.id = r.stall_id JOIN canteen c ON c.id = s.canteen_id WHERE 1 = 1 "
         );
         List<Object> params = new ArrayList<>();
-        if ("deleted".equals(status)) base.append(" AND r.is_deleted = 1 ");
-        else base.append(" AND r.is_deleted = 0 ");
+        if ("deleted".equals(status)) {
+            base.append(" AND r.is_deleted = 1 ");
+        } else {
+            base.append(" AND r.is_deleted = 0 ");
+            if ("reported".equals(status)) {
+                base.append(" AND EXISTS (SELECT 1 FROM review_report pending_rr WHERE pending_rr.review_id = r.id AND pending_rr.status = 0) ");
+            }
+        }
         if (stallId != null) { base.append(" AND r.stall_id = ? "); params.add(stallId); }
         if (notBlank(keyword)) {
             base.append(" AND (r.content LIKE ? OR u.username LIKE ? OR s.name LIKE ?) ");
@@ -447,11 +472,21 @@ public class CoreService {
         List<Map<String, Object>> list = jdbc.queryForList(
             "SELECT r.id, r.user_id, u.username, r.stall_id, s.name AS stall_name, c.name AS canteen_name, r.rating, r.content, r.is_deleted, r.created_at, r.updated_at, " +
                 "(SELECT COUNT(*) FROM review_like rl WHERE rl.review_id = r.id) AS like_count, " +
-                "(SELECT COUNT(DISTINCT rr.user_id) FROM review_report rr WHERE rr.review_id = r.id AND rr.status = 0) AS report_count " +
+                "(SELECT COUNT(DISTINCT rr.user_id) FROM review_report rr WHERE rr.review_id = r.id AND rr.status = 0) AS report_count, " +
+                "(SELECT ru.username FROM review_report latest_rr JOIN user ru ON ru.id = latest_rr.user_id WHERE latest_rr.review_id = r.id AND latest_rr.status = 0 ORDER BY latest_rr.updated_at DESC, latest_rr.id DESC LIMIT 1) AS latest_report_user, " +
+                "(SELECT latest_rr.reason FROM review_report latest_rr WHERE latest_rr.review_id = r.id AND latest_rr.status = 0 ORDER BY latest_rr.updated_at DESC, latest_rr.id DESC LIMIT 1) AS latest_report_reason, " +
+                "(SELECT latest_rr.updated_at FROM review_report latest_rr WHERE latest_rr.review_id = r.id AND latest_rr.status = 0 ORDER BY latest_rr.updated_at DESC, latest_rr.id DESC LIMIT 1) AS latest_report_at " +
                 base + " ORDER BY report_count DESC, r.updated_at DESC, r.id DESC LIMIT ? OFFSET ?",
             queryParams.toArray()
         );
         return pagePayload(list, total, page, pageSize);
+    }
+
+    public Map<String, Object> resolveReviewReports(Long reviewId) {
+        if (one("SELECT id FROM review WHERE id = ?", reviewId) == null) return null;
+        int updated = jdbc.update("UPDATE review_report SET status = 1, updated_at = CURRENT_TIMESTAMP WHERE review_id = ? AND status = 0", reviewId);
+        Integer pending = jdbc.queryForObject("SELECT COUNT(DISTINCT user_id) FROM review_report WHERE review_id = ? AND status = 0", Integer.class, reviewId);
+        return Map.of("result", "success", "updated_count", updated, "report_count", pending);
     }
 
     public Map<String, Object> updateUserRole(Long userId, int role) {
