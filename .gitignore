@@ -13,3 +13,4 @@ vue-frontend/dist/
 .codex-runtime/
 *.log
 HANDOFF.md
+.idea
