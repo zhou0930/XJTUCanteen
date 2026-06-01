@@ -123,10 +123,10 @@ const deleteReviewById = async (id) => {
   await deleteReview()
 }
 
-const resolveReviewReports = async (id) => {
-  const r = await api.adminResolveReviewReports(id)
-  if (r.code !== 0) return toast.error(r.message || '处理失败')
-  toast.success(r.data?.updated_count ? '举报已标记为已处理' : '没有待处理举报')
+const ignoreReviewReports = async (id) => {
+  const r = await api.adminIgnoreReviewReports(id)
+  if (r.code !== 0) return toast.error(r.message || '忽略失败')
+  toast.success(r.data?.updated_count ? '举报已忽略' : '没有待忽略的举报')
   const [, dashboardData] = await Promise.all([
     loadAdminReviews(),
     api.adminDashboard(),
@@ -253,7 +253,7 @@ onMounted(load)
         <option v-for="s in stalls" :key="s.id" :value="s.id">{{ s.name }}</option>
       </select>
       <select v-model="reviewFilters.status">
-        <option value="">未删除评论</option>
+        <option value="">未删除</option>
         <option value="reported">待处理举报</option>
         <option value="deleted">已删除</option>
       </select>
@@ -278,7 +278,7 @@ onMounted(load)
               </small>
             </td>
             <td class="action-cell">
-              <button v-if="Number(r.report_count || 0) > 0 && !r.is_deleted" class="secondary" type="button" @click="resolveReviewReports(r.id)">标记已处理</button>
+              <button v-if="Number(r.report_count || 0) > 0 && !r.is_deleted" class="secondary" type="button" @click="ignoreReviewReports(r.id)">忽略举报</button>
               <button v-if="!r.is_deleted" class="danger" type="button" @click="deleteReviewById(r.id)">删除</button>
               <span v-if="r.is_deleted" class="muted">已删除</span>
             </td>
@@ -288,7 +288,7 @@ onMounted(load)
     </div>
     <form class="row" @submit.prevent="deleteReview">
       <input v-model="form.reviewId" placeholder="评论 ID" required />
-      <button class="danger" type="submit">删除评论</button>
+      <button class="danger" type="submit">删除</button>
     </form>
   </section>
 

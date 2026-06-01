@@ -135,10 +135,27 @@ class ApiControllerMockMvcTest extends CanteenTestBase {
             .andExpect(jsonPath("$.data.liked").value(true))
             .andExpect(jsonPath("$.data.like_count").value(1));
 
+        mvc.perform(post("/api/reviews/{id}/reports", reviewId).header("Authorization", "Bearer " + userToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json(Map.of("reason", "已点有用时举报"))))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("请先取消有用后再举报"));
+
         mvc.perform(post("/api/reviews/{id}/likes", reviewId).header("Authorization", "Bearer " + userToken))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.liked").value(false))
             .andExpect(jsonPath("$.data.like_count").value(0));
+
+        mvc.perform(post("/api/reviews/{id}/reports", reviewId).header("Authorization", "Bearer " + userToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json(Map.of("reason", "不合适"))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.report_count").value(1));
+
+        mvc.perform(delete("/api/reviews/{id}/reports", reviewId).header("Authorization", "Bearer " + userToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.updated_count").value(1))
+            .andExpect(jsonPath("$.data.report_count").value(0));
 
         mvc.perform(post("/api/reviews/{id}/reports", reviewId).header("Authorization", "Bearer " + userToken)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -157,6 +174,19 @@ class ApiControllerMockMvcTest extends CanteenTestBase {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.updated_count").value(1))
             .andExpect(jsonPath("$.data.report_count").value(0));
+
+        mvc.perform(get("/api/stalls/{id}/reviews", sid).header("Authorization", "Bearer " + userToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.list[0].reported_by_me").value(true));
+
+        mvc.perform(delete("/api/reviews/{id}/reports", reviewId).header("Authorization", "Bearer " + userToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.updated_count").value(1))
+            .andExpect(jsonPath("$.data.report_count").value(0));
+
+        mvc.perform(get("/api/stalls/{id}/reviews", sid).header("Authorization", "Bearer " + userToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.list[0].reported_by_me").value(false));
 
         mvc.perform(delete("/api/admin/reviews/{id}", reviewId).header("Authorization", "Bearer " + adminToken))
             .andExpect(status().isOk())

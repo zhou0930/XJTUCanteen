@@ -43,6 +43,7 @@ export const api = {
   submitReview: (body) => client.post('/reviews', body),
   likeReview: (id) => client.post(`/reviews/${id}/likes`),
   reportReview: (id, body) => client.post(`/reviews/${id}/reports`, body),
+  cancelReviewReport: (id) => client.delete(`/reviews/${id}/reports`),
   myReviews: (params) => client.get(`/users/me/reviews?${q(params)}`),
   updateMyReview: (id, body) => client.put(`/users/me/reviews/${id}`, body),
   deleteMyReview: (id) => client.delete(`/users/me/reviews/${id}`),
@@ -75,5 +76,5 @@ export const api = {
   adminUpdateStall: (id, body) => client.put(`/admin/stalls/${id}`, body),
   adminDeleteStall: (id) => client.delete(`/admin/stalls/${id}`),
   adminDeleteReview: (id) => client.delete(`/admin/reviews/${id}`),
-  adminResolveReviewReports: (id) => client.put(`/admin/reviews/${id}/reports`, {}),
+  adminIgnoreReviewReports: (id) => client.put(`/admin/reviews/${id}/reports`, {}),
 }

@@ -245,7 +245,7 @@ public class CoreService {
                 "(SELECT COUNT(*) FROM review_like rl WHERE rl.review_id = r.id) AS like_count, " +
                 "(SELECT COUNT(DISTINCT rr.user_id) FROM review_report rr WHERE rr.review_id = r.id AND rr.status = 0) AS report_count, " +
                 "EXISTS(SELECT 1 FROM review_like my_rl WHERE my_rl.review_id = r.id AND my_rl.user_id = ?) AS liked_by_me, " +
-                "EXISTS(SELECT 1 FROM review_report my_rr WHERE my_rr.review_id = r.id AND my_rr.user_id = ? AND my_rr.status = 0) AS reported_by_me " +
+                "EXISTS(SELECT 1 FROM review_report my_rr WHERE my_rr.review_id = r.id AND my_rr.user_id = ? AND my_rr.status <> 2) AS reported_by_me " +
                 "FROM review r JOIN user u ON u.id = r.user_id WHERE r.stall_id = ? AND r.is_deleted = 0 " + order + " LIMIT ? OFFSET ?",
             viewerId, viewerId, stallId, pageSize, (page - 1) * pageSize
         );
@@ -269,6 +269,9 @@ public class CoreService {
 
     public Map<String, Object> reportReview(Long userId, Long reviewId, String reason) {
         if (one("SELECT id FROM review WHERE id = ? AND is_deleted = 0", reviewId) == null) return null;
+        if (one("SELECT id FROM review_like WHERE user_id = ? AND review_id = ?", userId, reviewId) != null) {
+            return Map.of("_error", "请先取消有用后再举报");
+        }
         Map<String, Object> report = one("SELECT id, user_id, review_id, reason, status, created_at FROM review_report WHERE user_id = ? AND review_id = ?", userId, reviewId);
         if (report == null) {
             Long id = insertAndReturnId("INSERT INTO review_report (user_id, review_id, reason) VALUES (?, ?, ?)",
@@ -283,6 +286,16 @@ public class CoreService {
         if (report != null)
             report.put("report_count", count);
         return report;
+    }
+
+    public Map<String, Object> cancelReviewReport(Long userId, Long reviewId) {
+        if (one("SELECT id FROM review WHERE id = ? AND is_deleted = 0", reviewId) == null) return null;
+        int updated = jdbc.update(
+            "UPDATE review_report SET status = 2, updated_at = CURRENT_TIMESTAMP WHERE user_id = ? AND review_id = ? AND status <> 2",
+            userId, reviewId
+        );
+        Integer count = jdbc.queryForObject("SELECT COUNT(DISTINCT user_id) FROM review_report WHERE review_id = ? AND status = 0", Integer.class, reviewId);
+        return Map.of("result", "success", "updated_count", updated, "report_count", count, "reported", false);
     }
 
     public Map<String, Object> getMyReviews(Long userId, int page, int pageSize) {
@@ -482,7 +495,7 @@ public class CoreService {
         return pagePayload(list, total, page, pageSize);
     }
 
-    public Map<String, Object> resolveReviewReports(Long reviewId) {
+    public Map<String, Object> ignoreReviewReports(Long reviewId) {
         if (one("SELECT id FROM review WHERE id = ?", reviewId) == null) return null;
         int updated = jdbc.update("UPDATE review_report SET status = 1, updated_at = CURRENT_TIMESTAMP WHERE review_id = ? AND status = 0", reviewId);
         Integer pending = jdbc.queryForObject("SELECT COUNT(DISTINCT user_id) FROM review_report WHERE review_id = ? AND status = 0", Integer.class, reviewId);

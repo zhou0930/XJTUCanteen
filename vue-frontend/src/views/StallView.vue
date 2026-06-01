@@ -70,6 +70,10 @@ const likeReview = async (review) => {
 const openReportForm = (review) => {
   if (!requireLogin()) return
   if (review.reported_by_me) return
+  if (review.liked_by_me) {
+    toast.error('请先取消有用后再举报')
+    return
+  }
   reportingReviewId.value = reportingReviewId.value === review.id ? null : review.id
 }
 
@@ -81,6 +85,14 @@ const submitReport = async (review) => {
   reportForms[review.id] = ''
   reportingReviewId.value = null
   toast.success('已提交举报')
+  await load()
+}
+
+const cancelReport = async (review) => {
+  if (!requireLogin()) return
+  const r = await api.cancelReviewReport(review.id)
+  if (r.code !== 0) return toast.error(r.message || '取消举报失败')
+  toast.success('已取消举报')
   await load()
 }
 
@@ -121,7 +133,10 @@ onMounted(load)
         <strong>{{ r.username || '匿名用户' }}</strong>
         <span class="muted">已举报，评论已折叠。</span>
       </div>
-      <small class="muted">{{ r.updated_at || r.created_at }}</small>
+      <div class="row">
+        <button class="secondary" type="button" @click="cancelReport(r)">取消举报</button>
+        <small class="muted">{{ r.updated_at || r.created_at }}</small>
+      </div>
     </div>
     <template v-else>
       <div class="row" style="justify-content:space-between;">
@@ -133,7 +148,7 @@ onMounted(load)
         <button class="secondary" :class="{ active: r.liked_by_me }" type="button" @click="likeReview(r)">
           {{ r.liked_by_me ? '取消有用' : '有用' }} {{ r.like_count || 0 }}
         </button>
-        <button class="secondary" type="button" @click="openReportForm(r)">举报 {{ r.report_count || 0 }}</button>
+        <button class="secondary" type="button" @click="openReportForm(r)">举报</button>
       </div>
       <form v-if="reportingReviewId === r.id" class="report-box" @submit.prevent="submitReport(r)">
         <input v-model="reportForms[r.id]" placeholder="举报原因，可选" />

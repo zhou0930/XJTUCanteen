@@ -157,6 +157,16 @@ public class ApiController {
         if (uid == null) return unauthorized();
         Map<String, Object> item = coreService.reportReview(uid, id, nullableString(body.get("reason")));
         if (item == null) return notFound();
+        if (item.containsKey("_error")) return badRequest(valueOf(item.get("_error")));
+        return ResponseEntity.ok(ApiResponse.success(item));
+    }
+
+    @DeleteMapping("/reviews/{id}/reports")
+    public ResponseEntity<ApiResponse> cancelReviewReport(HttpServletRequest request, @PathVariable Long id) {
+        Long uid = authUserId(request);
+        if (uid == null) return unauthorized();
+        Map<String, Object> item = coreService.cancelReviewReport(uid, id);
+        if (item == null) return notFound();
         return ResponseEntity.ok(ApiResponse.success(item));
     }
 
@@ -364,10 +374,10 @@ public class ApiController {
     }
 
     @PutMapping("/admin/reviews/{id}/reports")
-    public ResponseEntity<ApiResponse> adminResolveReviewReports(HttpServletRequest request, @PathVariable Long id) {
+    public ResponseEntity<ApiResponse> adminIgnoreReviewReports(HttpServletRequest request, @PathVariable Long id) {
         ResponseEntity<ApiResponse> guard = requireAdmin(request);
         if (guard != null) return guard;
-        Map<String, Object> item = coreService.resolveReviewReports(id);
+        Map<String, Object> item = coreService.ignoreReviewReports(id);
         if (item == null) return notFound();
         return ResponseEntity.ok(ApiResponse.success(item));
     }

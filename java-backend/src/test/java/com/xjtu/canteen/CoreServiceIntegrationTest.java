@@ -160,23 +160,39 @@ class CoreServiceIntegrationTest extends CanteenTestBase {
         assertThat(like.get("liked")).isEqualTo(false);
         assertThat(like.get("like_count")).isEqualTo(0);
         assertThat(coreService.likeReview(reader, reviewId).get("like_count")).isEqualTo(1);
+        assertThat(coreService.reportReview(reader, reviewId, "仍然有用但想举报").get("_error")).isEqualTo("请先取消有用后再举报");
+        assertThat(coreService.likeReview(reader, reviewId).get("liked")).isEqualTo(false);
         assertThat(coreService.reportReview(reader, reviewId, "疑似广告").get("report_count")).isEqualTo(1);
         assertThat(coreService.reportReview(reader, reviewId, "重复点击").get("report_count")).isEqualTo(1);
         assertThat(coreService.reportReview(otherReader, reviewId, "内容不合适").get("report_count")).isEqualTo(2);
 
         Map<String, Object> page = coreService.adminReviews(1, 10, sid, "治理", null);
         assertThat((Integer) page.get("total")).isEqualTo(1);
-        assertThat(first(page).get("like_count")).isEqualTo(1L);
+        assertThat(first(page).get("like_count")).isEqualTo(0L);
         assertThat(first(page).get("report_count")).isEqualTo(2L);
 
         Map<String, Object> dashboard = coreService.adminDashboard();
         assertThat(dashboard.get("pending_report_count")).isEqualTo(2);
         assertThat((List<?>) dashboard.get("top_stalls")).isNotEmpty();
 
-        Map<String, Object> resolved = coreService.resolveReviewReports(reviewId);
-        assertThat(resolved.get("updated_count")).isEqualTo(2);
+        Map<String, Object> canceled = coreService.cancelReviewReport(reader, reviewId);
+        assertThat(canceled.get("updated_count")).isEqualTo(1);
+        assertThat(canceled.get("report_count")).isEqualTo(1);
+        dashboard = coreService.adminDashboard();
+        assertThat(dashboard.get("pending_report_count")).isEqualTo(1);
+        assertThat(coreService.reportReview(reader, reviewId, "重新举报").get("report_count")).isEqualTo(2);
+
+        Map<String, Object> ignored = coreService.ignoreReviewReports(reviewId);
+        assertThat(ignored.get("updated_count")).isEqualTo(2);
         dashboard = coreService.adminDashboard();
         assertThat(dashboard.get("pending_report_count")).isEqualTo(0);
+        Map<String, Object> readerViewAfterIgnore = coreService.getStallReviews(sid, 1, 10, "latest", reader);
+        assertThat(first(readerViewAfterIgnore).get("reported_by_me")).isEqualTo(true);
+
+        canceled = coreService.cancelReviewReport(reader, reviewId);
+        assertThat(canceled.get("updated_count")).isEqualTo(1);
+        Map<String, Object> readerViewAfterCancel = coreService.getStallReviews(sid, 1, 10, "latest", reader);
+        assertThat(first(readerViewAfterCancel).get("reported_by_me")).isEqualTo(false);
 
         coreService.softDeleteReview(reviewId);
         dashboard = coreService.adminDashboard();
