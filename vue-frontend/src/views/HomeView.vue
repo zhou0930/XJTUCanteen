@@ -35,7 +35,7 @@ const loadBase = async () => {
 
 const loadStalls = async (reset = true) => {
   if (reset) page.value = 1
-  const r = await api.stalls({ page: page.value, page_size: 12, ...cleanParams() })
+  const r = await api.stalls({ page: page.value, page_size: 12, exclude_blacklist: true, ...cleanParams() })
   const list = r.data?.list || []
   stalls.value = reset ? list : [...stalls.value, ...list]
   total.value = r.data?.total || list.length
