@@ -7,10 +7,18 @@ const hot = ref([])
 const latest = ref([])
 const active = ref('score')
 
+const formatTime = (value) => {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
 const rankMeta = {
   score: { title: '评分榜', value: (i) => `${Number(i.avg_rating || 0).toFixed(1)} 分`, list: score },
   hot: { title: '热度榜', value: (i) => `${i.review_count || 0} 条评价`, list: hot },
-  latest: { title: '最新评价', value: (i) => i.latest_review_time || '-', list: latest },
+  latest: { title: '最新评价', value: (i) => formatTime(i.latest_review_time) || '-', list: latest },
 }
 
 const currentList = () => rankMeta[active.value].list.value || []

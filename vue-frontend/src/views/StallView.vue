@@ -15,6 +15,14 @@ const form = reactive({ rating: 5, content: '' })
 const reportForms = reactive({})
 const reportingReviewId = ref(null)
 
+const formatTime = (value) => {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
 const load = async () => {
   const id = route.params.id
   const [d, r] = await Promise.all([
@@ -135,7 +143,7 @@ onMounted(load)
       </div>
       <div class="row">
         <button class="secondary" type="button" @click="cancelReport(r)">取消举报</button>
-        <small class="muted">{{ r.updated_at || r.created_at }}</small>
+        <small class="muted">{{ formatTime(r.updated_at || r.created_at) }}</small>
       </div>
     </div>
     <template v-else>
@@ -157,7 +165,7 @@ onMounted(load)
           <button class="secondary" type="button" @click="reportingReviewId = null">取消</button>
         </div>
       </form>
-      <small class="muted">{{ r.updated_at || r.created_at }}</small>
+      <small class="muted">{{ formatTime(r.updated_at || r.created_at) }}</small>
     </template>
   </article>
   <div v-if="!reviews.length" class="empty panel">暂无评价。</div>
