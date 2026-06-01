@@ -142,6 +142,10 @@ public class CoreService {
     }
 
     public Map<String, Object> queryStalls(int page, int pageSize, Long canteenId, String category, String keyword, String sortBy, String tagName) {
+        return queryStalls(page, pageSize, canteenId, category, keyword, sortBy, tagName, false, null);
+    }
+
+    public Map<String, Object> queryStalls(int page, int pageSize, Long canteenId, String category, String keyword, String sortBy, String tagName, boolean excludeBlacklist, Long userId) {
         StringBuilder base = new StringBuilder(" FROM stall s JOIN canteen c ON c.id = s.canteen_id ");
         List<Object> params = new ArrayList<>();
         if (notBlank(tagName)) {
@@ -152,6 +156,10 @@ public class CoreService {
         if (notBlank(category)) { base.append(" AND s.category = ? "); params.add(category); }
         if (notBlank(keyword)) { base.append(" AND (s.name LIKE ? OR s.description LIKE ?) "); params.add("%" + keyword + "%"); params.add("%" + keyword + "%"); }
         if (notBlank(tagName)) { base.append(" AND t.name = ? "); params.add(tagName); }
+        if (excludeBlacklist && userId != null) {
+            base.append(" AND NOT EXISTS (SELECT 1 FROM blacklist b WHERE b.user_id = ? AND b.stall_id = s.id) ");
+            params.add(userId);
+        }
 
         String orderClause = " ORDER BY id DESC ";
         if ("score".equals(sortBy)) orderClause = " ORDER BY avg_rating DESC, review_count DESC, id DESC ";
@@ -321,8 +329,12 @@ public class CoreService {
     }
 
     public Map<String, Object> addFavorite(Long userId, Long stallId) {
+        int removedFromBlacklist = jdbc.update("DELETE FROM blacklist WHERE user_id = ? AND stall_id = ?", userId, stallId);
         jdbc.update("INSERT IGNORE INTO favorite (user_id, stall_id) VALUES (?, ?)", userId, stallId);
-        return one("SELECT id, user_id, stall_id, created_at FROM favorite WHERE user_id = ? AND stall_id = ?", userId, stallId);
+        Map<String, Object> item = one("SELECT id, user_id, stall_id, created_at FROM favorite WHERE user_id = ? AND stall_id = ?", userId, stallId);
+        Map<String, Object> result = new LinkedHashMap<>(item == null ? Map.of() : item);
+        result.put("removed_from_blacklist", removedFromBlacklist > 0);
+        return result;
     }
 
     public Map<String, Object> removeFavorite(Long userId, Long stallId) {
@@ -342,8 +354,12 @@ public class CoreService {
     }
 
     public Map<String, Object> addBlacklist(Long userId, Long stallId) {
+        int removedFromFavorites = jdbc.update("DELETE FROM favorite WHERE user_id = ? AND stall_id = ?", userId, stallId);
         jdbc.update("INSERT IGNORE INTO blacklist (user_id, stall_id) VALUES (?, ?)", userId, stallId);
-        return one("SELECT id, user_id, stall_id, created_at FROM blacklist WHERE user_id = ? AND stall_id = ?", userId, stallId);
+        Map<String, Object> item = one("SELECT id, user_id, stall_id, created_at FROM blacklist WHERE user_id = ? AND stall_id = ?", userId, stallId);
+        Map<String, Object> result = new LinkedHashMap<>(item == null ? Map.of() : item);
+        result.put("removed_from_favorites", removedFromFavorites > 0);
+        return result;
     }
 
     public Map<String, Object> removeBlacklist(Long userId, Long stallId) {

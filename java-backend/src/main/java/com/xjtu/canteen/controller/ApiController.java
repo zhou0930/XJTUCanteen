@@ -99,15 +99,18 @@ public class ApiController {
 
     @GetMapping("/stalls")
     public ResponseEntity<ApiResponse> stalls(
+        HttpServletRequest request,
         @RequestParam(defaultValue = "1") int page,
         @RequestParam(name = "page_size", defaultValue = "10") int pageSize,
         @RequestParam(name = "canteen_id", required = false) Long canteenId,
         @RequestParam(required = false) String category,
         @RequestParam(required = false) String keyword,
         @RequestParam(name = "sort_by", required = false) String sortBy,
-        @RequestParam(name = "tag_name", required = false) String tagName
+        @RequestParam(name = "tag_name", required = false) String tagName,
+        @RequestParam(name = "exclude_blacklist", defaultValue = "false") boolean excludeBlacklist
     ) {
-        return ResponseEntity.ok(ApiResponse.success(coreService.queryStalls(page, pageSize, canteenId, category, keyword, sortBy, tagName)));
+        Long uid = excludeBlacklist ? authUserId(request) : null;
+        return ResponseEntity.ok(ApiResponse.success(coreService.queryStalls(page, pageSize, canteenId, category, keyword, sortBy, tagName, excludeBlacklist, uid)));
     }
 
     @GetMapping("/stalls/{id}")

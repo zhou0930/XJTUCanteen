@@ -43,14 +43,14 @@ const submit = async () => {
 const addFav = async () => {
   if (!requireLogin()) return
   const r = await api.addFavorite({ stall_id: Number(route.params.id) })
-  if (r.code === 0) toast.success('已收藏')
+  if (r.code === 0) toast.success(r.data?.removed_from_blacklist ? '已收藏，系统已自动移出黑名单' : '已收藏')
   else toast.error(r.message || '收藏失败')
 }
 
 const addBlack = async () => {
   if (!requireLogin()) return
   const r = await api.addBlacklist({ stall_id: Number(route.params.id) })
-  if (r.code === 0) toast.success('已加入黑名单')
+  if (r.code === 0) toast.success(r.data?.removed_from_favorites ? '已加入黑名单，系统已自动取消收藏' : '已加入黑名单')
   else toast.error(r.message || '操作失败')
 }
 

@@ -45,6 +45,14 @@ const load = async () => {
   tasteProfile.value = p.data || null
 }
 
+const formatTime = (value) => {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
 const readAvatar = (event) => {
   const file = event.target.files?.[0]
   if (!file) return
@@ -207,7 +215,7 @@ onMounted(load)
   <section v-if="activeTab === 'history'" class="stack">
     <article v-for="h in history" :key="`${h.stall_id}-${h.visited_at}`" class="card row" style="justify-content:space-between;">
       <RouterLink :to="`/stall/${h.stall_id}`">{{ h.stall_name }}</RouterLink>
-      <small class="muted">{{ h.visited_at }}</small>
+      <small class="muted">{{ formatTime(h.visited_at) }}</small>
     </article>
   </section>
 </template>
